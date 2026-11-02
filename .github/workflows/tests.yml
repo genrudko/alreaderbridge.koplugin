@@ -10,4 +10,4 @@ jobs:
       - name: Install LuaJIT
         run: sudo apt-get update && sudo apt-get install -y luajit
       - name: Run syntax and mapping tests
-        run: ./tests/run.sh
+        run: sh tests/run.sh
