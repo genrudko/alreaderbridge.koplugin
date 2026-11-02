@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0" xmlns:l="http://www.w3.org/1999/xlink">
+<description><title-info><genre>sf_fantasy</genre><author><first-name>Тест</first-name><last-name>Движков</last-name></author><book-title>ABR Fixture Test</book-title><lang>ru</lang></title-info></description>
+<body>
+<title><p>Заглавие книги — тридцать один</p></title>
+<section><title><p>Глава 1</p></title>
+<p>Первый абзац с номером 001. Длинный текст в книге.</p>
+<subtitle>***</subtitle>
+<p>Второй абзац <emphasis>внутренний акцент</emphasis> и продолжение после.</p>
+<p>Третий абзац <strong>жирный текст</strong> после окончания.</p>
+<p>Текст со ссылкой <a l:href="https://example.com/source" type="note">внутренний переход</a> и концовкой.</p>
+<p>Абзац с примечанием <a l:href="#note1" type="note">[1]</a> заканчивается здесь.</p>
+<empty-line/>
+<subtitle>И вот другой подзаголовок</subtitle>
+<p>Четвёртый абзац с &amp; и &#8212; и неразрывным&#160;пробелом.</p>
+</section>
+<section><title><p>Глава 2</p></title>
+<p>Пятый большой текст с пробелами между словами.</p>
+<subtitle>***</subtitle>
+<p>Последний фрагмент: поехали дальше, точно сюда!</p>
+</section>
+</body>
+<body name="notes"><section id="note1"><p>Примечание, его не следует считать основным текстом.</p></section></body>
+</FictionBook>

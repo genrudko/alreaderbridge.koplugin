@@ -1,0 +1,10 @@
+# KOReader device-specific data / secrets
+settings.reader.lua
+**/backup_cloud_creds.lua
+**/alreaderbridge.lua
+*.bridge-backup
+*.bak
+*.log
+*.zip
+.DS_Store
+tests/runtime/
