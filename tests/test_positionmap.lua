@@ -41,6 +41,6 @@ for _,entry in ipairs(map.segments) do
 end
 assert(not pm.toXPointer(map,map.total+1))
 assert(not pm.toAlReader(map,"/FictionBook[1]/description[1]/title-info[1].0"))
-assert(not pm.build(s:gsub('encoding="utf%-8"','encoding="windows-1251"')))
-assert(not pm.build(s:gsub('</body>','<p><image l:href="#x"/></p></body>',1)))
+assert(not pm.build(s:gsub('encoding="utf%-8"','encoding="made-up"')))
+assert(pm.build(s:gsub('</body>','<p><image l:href="#x"/></p></body>',1)))
 print("PASS: synthetic AlReaderX native-fixture mapping and roundtrip",count)

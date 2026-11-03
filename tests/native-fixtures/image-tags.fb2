@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0" xmlns:l="http://www.w3.org/1999/xlink">
+<description><title-info><genre>sf_fantasy</genre><author><first-name>Test</first-name><last-name>Tags</last-name></author><book-title>Test markup</book-title><lang>ru</lang></title-info></description>
+<body><section><title><p>Заголовок</p></title>
+<p>Простой абзац перед изображением.</p>
+<image l:href="#png01"/>
+<p>Простой абзац после изображения.</p>
+<p>До встроенного <image l:href="#png01"/> и после встроенного изображения.</p>
+<p>Этот абзац содержит <strikethrough>зачёркнутый текст</strikethrough> и ещё текст.</p>
+<p>Нижний индекс <sub>индекс</sub> и верхний <sup>индекс</sup> в конце.</p>
+<p>Последний после всяких тегов абзац.</p>
+</section></body>
+<binary id="png01" content-type="image/png">iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlZY4sAAAAASUVORK5CYII=</binary>
+</FictionBook>

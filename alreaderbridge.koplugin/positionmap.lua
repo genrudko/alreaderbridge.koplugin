@@ -2,6 +2,7 @@
 -- (AlFormat, AlFormatFB2, AlAXML) and compared against the running Android engine.
 -- The Kindle uses KOReader's original FB2 DOM paths and XPointer text offsets.
 local M={}
+local Charset=require("charset")
 local function u16len(s)
     local n=0
     local i=1
@@ -50,13 +51,37 @@ local function tagend(s,opening)
 end
 function M.build(xml)
     if type(xml)~="string" or #xml>16*1024*1024 then return nil,"FB2 missing or too large" end
-    -- Raw XML byte offsets are meaningful only after decoding the source charset.
-    -- Reject unsupported encodings instead of silently publishing incorrect positions.
-    local declaration=xml:match('^%s*<%?xml%s+([^?]+)%?>')
-    local enc=declaration and (declaration:match('encoding%s*=%s*"([^"]+)"') or declaration:match("encoding%s*=%s*'([^']+)'") )
-    if enc and enc:lower()~="utf-8" and enc:lower()~="utf8" then
-        return nil,"FB2 encoding "..enc.." is not safely supported for exact synchronization"
+    -- Keep raw file bytes for source offsets (AlReaderX table markers); use
+    -- decoded UTF-8 only for constructing text nodes & XPointer paths.
+    local raw=xml
+    local encoding
+    xml,encoding=Charset.decode(xml)
+    if not xml then return nil,encoding end
+    local table_starts={}
+    local source=raw
+    if encoding=="utf-16le" or encoding=="utf-16be" then
+        local needle="<table"
+        local bytes={}
+        for i=1,#needle do
+            local ch=needle:sub(i,i)
+            bytes[i]=encoding=="utf-16le" and (ch.."\0") or ("\0"..ch)
+        end
+        local encoded=table.concat(bytes)
+        local at=1
+        while true do
+            local k=source:find(encoded,at,true)
+            if not k then break end
+            table_starts[#table_starts+1]=k-1;at=k+#encoded
+        end
+    else
+        local at=1
+        while true do
+            local k=source:find("<table",at,true)
+            if not k then break end
+            table_starts[#table_starts+1]=k-1;at=k+6
+        end
     end
+    local table_cursor=0
     if not xml:find("<FictionBook",1,true) and not xml:find("<fb:FictionBook",1,true) then
         return nil,"Not an FB2 FictionBook XML" end
     local root,stack=nil,{}
@@ -93,7 +118,7 @@ function M.build(xml)
                 if tag then
                     elements=elements+1;if elements>80000 then return nil,"XML too complex" end
                     local name=lname(tag)
-                    if name=="table" or name=="image" or name=="code" or name=="sup" or name=="sub" or name=="strikethrough" then
+                    if name=="script" or name=="style" then
                         local in_body=false
                         for _,ancestor in ipairs(stack) do if ancestor.name=="body" then in_body=true;break end end
                         if in_body then unsupported=unsupported or name end
@@ -108,6 +133,13 @@ function M.build(xml)
                     end
                     local path=(parent and parent.path or "").."/"..name.."["..index.."]"
                     local node={kind="element",name=name,path=path,children={},counts={},href=attr(content,"href"),attrname=attr(content,"name")}
+                    if name=="table" then
+                        table_cursor=table_cursor+1
+                        node.table_source_start=table_starts[table_cursor]
+                        if not node.table_source_start then
+                            unsupported=unsupported or "table source offset"
+                        end
+                    end
                     if parent then parent.children[#parent.children+1]=node else root=node end
                     if name=="body" and not firstbody and (not node.attrname or node.attrname=="") then firstbody=node end
                     if name=="book-title" and not booktitle then booktitle=node end
@@ -138,9 +170,10 @@ function M.build(xml)
             else
                 local name=ch.name
                 local before,after=0,0
-                if name=="strong" or name=="emphasis" then before,after=2,2
+                if name=="strong" or name=="emphasis" or name=="strikethrough" then before,after=2,2
+                elseif name=="sup" or name=="sub" or name=="code" then before,after=3,3
                 elseif name=="a" then before,after=u16len(ch.href or "")+5,3
-                elseif name=="image" then before,after=u16len(ch.href or "")+2,0 end
+                elseif name=="image" then before,after=u16len(ch.href or "")+3,0 end
                 pos=pos+before
                 walktext(ch,record)
                 pos=pos+after
@@ -152,6 +185,26 @@ function M.build(xml)
             if ch.kind=="element" then
                 if ch.name=="p" or ch.name=="subtitle" or ch.name=="v" or ch.name=="text-author" then
                     walktext(ch,record)
+                elseif ch.name=="image" then
+                    -- Standalone <image> occupies a dedicated AlReader paragraph;
+                    -- observed marker is one character longer than the inline image.
+                    pos=pos+u16len(ch.href or "")+4
+                elseif ch.name=="table" then
+                    -- AlReaderX emits one internal navigation marker at every
+                    -- end-of-row: \014<source byte offset>:<zero-based row>\015
+                    -- and a trailing newline after the last row.
+                    local row=0
+                    for _,item in ipairs(ch.children) do
+                        if item.kind=="element" and item.name=="tr" then
+                            visit(item,record)
+                            local marker="\014"..ch.table_source_start..":"..row.."\015"
+                            pos=pos+u16len(marker)
+                            row=row+1
+                        elseif item.kind=="element" then
+                            visit({children={item}},record)
+                        end
+                    end
+                    pos=pos+1
                 else visit(ch,record) end
             end
         end

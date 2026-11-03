@@ -13,6 +13,7 @@ local lfs=require("libs/libkoreader-lfs")
 local NetworkMgr=require("ui/network/manager")
 local core=require("core")
 local mapper=require("positionmap")
+local epubmap=require("epubmap")
 local _=require("gettext")
 
 local Bridge=WidgetContainer:extend{
@@ -107,6 +108,16 @@ function Bridge:book_info()
         data=read_file(path,MAX_FB2)
         inner=book_filename(path)
         size=attrs.size
+    elseif path:lower():match("%.epub$") then
+        -- The EPUB spine has a different internal text order and document ID
+        -- than FB2; parse its OPF and spine rather than pretending it is FB2.
+        local epub,reason=epubmap.open(path)
+        if not epub then return nil,reason end
+        local attrs=lfs.attributes(path)
+        if not attrs then return nil,"EPUB file not found" end
+        self.book_cache={path=path,kind="epub",map=epub,
+            sync_name=epub.sync_name,inner_name=book_filename(path),size=attrs.size}
+        return self.book_cache
     elseif path:lower():match("%.fb2%.zip$") then
         local Archiver=require("ffi/archiver")
         local arc=Archiver.Reader:new()
@@ -125,7 +136,7 @@ function Bridge:book_info()
         arc:close()
         if count~=1 then return nil,"FB2 ZIP must contain exactly one FB2 file" end
     else
-        return nil,"Supported books: .fb2 and .fb2.zip"
+        return nil,"Supported books: .fb2, .fb2.zip and compatible .epub"
     end
     if not data or #data~=size then return nil,"Uncompressed FB2 size mismatch" end
     self.book_cache={path=path,xml=data,inner_name=inner,size=size}
@@ -186,7 +197,8 @@ function Bridge:load_remote()
         else
             for _,it in ipairs(listed) do
                 local parsed=core.sync_filename(it.name)
-                if parsed and parsed.size==book.size then
+                if parsed and ((parsed.kind=="fb2" and parsed.size==book.size)
+                    or (parsed.kind=="epub" and parsed.name==book.sync_name)) then
                     local rec=dav.get(cfg,it.name)
                     if rec then
                         rec.etag=rec.etag or it.etag
@@ -221,7 +233,7 @@ function Bridge:current_record(interactive)
             source="offline-local"
         end
     end
-    local r,reason=core.match_record(book.inner_name,book.size,records)
+    local r,reason=core.match_record(book.inner_name,book.size,records,book.sync_name)
     if not r then return nil,reason end
     r.source=source
     self.last_record=r
@@ -230,6 +242,7 @@ end
 function Bridge:position_map()
     local book,why=self:book_info()
     if not book then return nil,why end
+    if book.kind=="epub" then return book.map end
     if self.parsed and self.parsed.path==book.path then return self.parsed.map end
     local map,err=mapper.build(book.xml)
     if not map then return nil,err end
@@ -318,7 +331,7 @@ function Bridge:choose_anchor()
     local xp,error_msg=mapper.toXPointer(map,r.position)
     local current=self:current_xp()
     local current_pos,reason=mapper.toAlReader(map,current,self:engine_text(current))
-    notify(table.concat({"Проверка координат FB2 (без ручной калибровки)",
+    notify(table.concat({"Проверка координат FB2/EPUB (без ручной калибровки)",
         "AlReaderX: "..r.position,
         "KOReader XPointer: "..tostring(xp or error_msg),
         "Текущая координата Kindle: "..tostring(current_pos or reason),
@@ -428,14 +441,14 @@ function Bridge:diagnostics()
     if not r then return notify("AlReaderX Bridge: "..tostring(why)) end
     local map=self:position_map()
     notify(table.concat({
-        "AlReaderX Bridge v1.3 — прямые координаты",
+        "AlReaderX Bridge v1.4 — FB2/EPUB",
         "Книга: "..book_filename(self.ui.document.file),
         "Источник: "..r.source,
         "Файл: "..r.name,
         "Позиция: "..r.position,
         "Отправитель текущей записи: "..r.opaque,
         "ID Kindle: "..tostring(self.settings.sender_id),
-        "Размер FB2: "..r.size,
+        "Размер исходного файла: "..r.size,
         "XML-модель: "..(map and (tostring(map.total).." символов, полная") or "недоступна"),
         "WebDAV: "..boolword(self:can_dav()),
         "Автоимпорт: "..boolword(self.settings.auto_import),
@@ -546,7 +559,7 @@ end
 
 function Bridge:addToMainMenu(menu_items)
     menu_items.alreaderbridge={
-        text="AlReaderX Bridge v1.3.1",sorting_hint="more_tools",
+        text="AlReaderX Bridge v1.4.0",sorting_hint="more_tools",
         sub_item_table={
             {text="Импортировать позицию сейчас",callback=function()self:import_position(true)end},
             {text="Показать соответствие координат",callback=function()self:choose_anchor()end},

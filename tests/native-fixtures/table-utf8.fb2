@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0" xmlns:l="http://www.w3.org/1999/xlink">
+<description><title-info><genre>sf_fantasy</genre><author><first-name>Тест</first-name><last-name>Проверка</last-name></author><book-title>Контроль разметки</book-title><lang>ru</lang></title-info></description>
+<body><section><title><p>Глава первая с длинным названием</p></title>
+<p>Первый обычный абзац с русскими буквами. Пролог.</p>
+<table><tr><td><p>Таблица: ячейка 1-1.</p></td><td><p>Таблица: ячейка 1-2.</p></td></tr>
+<tr><td><p>Таблица: ячейка 2-1.</p></td><td><p>Таблица: ячейка 2-2.</p></td></tr></table>
+<p>После таблицы есть обычная строка и другие теги: <emphasis>вот акцент</emphasis>, <strong>жирное</strong>, <sup>верхний индекс</sup>.</p>
+<p>А это глубокая разметка: <emphasis><strong>оба сразу</strong> и текст</emphasis>, затем <code>фрагмент кода</code>.</p>
+<p>Ссылка <a l:href="#note1">раздел</a> и после неё текст.</p>
+</section></body><body name="notes"><section id="note1"><p>Примечание.</p></section></body>
+</FictionBook>

@@ -13,11 +13,17 @@ end
 
 function M.sync_filename(name)
     if type(name) ~= "string" or #name > 250 or name:find("[/\\%c]") then return nil end
+    -- EPUB uses filename's Java long-hash and the embedded EPUB book ID,
+    -- unlike FB2, which embeds the source's uncompressed file size in hex.
+    local epubhash,epubid=name:match("%.([a-fA-F0-9]+)%.!([%w%-]+)$")
+    if epubhash and epubid and #epubid>=8 and #epubid<=96 then
+        return {kind="epub",hash=epubhash:lower(),id=epubid,name=name}
+    end
     local hx, fingerprint = name:match("%.([a-fA-F0-9]+)%.([a-fA-F0-9]+)$")
     if not hx or not fingerprint or #hx > 12 or #fingerprint < 8 then return nil end
     local size = tonumber(hx,16)
     if not size or size < 1 or size > 1024*1024*1024 then return nil end
-    return { size = size, fingerprint = fingerprint:lower(), name = name, stem = name:match("^([^.]+)") or "" }
+    return { kind="fb2",size = size, fingerprint = fingerprint:lower(), name = name, stem = name:match("^([^.]+)") or "" }
 end
 
 local chars = { ["а"]="a",["б"]="b",["в"]="v",["г"]="g",["д"]="d",["е"]="e",["ё"]="e",["ж"]="zh",["з"]="z",["и"]="i",["й"]="y",["к"]="k",["л"]="l",["м"]="m",["н"]="n",["о"]="o",["п"]="p",["р"]="r",["с"]="s",["т"]="t",["у"]="u",["ф"]="f",["х"]="h",["ц"]="ts",["ч"]="ch",["ш"]="sh",["щ"]="sch",["ы"]="y",["э"]="e",["ю"]="yu",["я"]="ya",["ь"]="",["ъ"]="" }
@@ -29,8 +35,29 @@ function M.translit(name)
     return (name:gsub("[^a-z0-9]", ""))
 end
 
-function M.match_record(book_path, book_size, entries)
-    -- Strong identification: identical uncompressed size and substantial name prefix.
+function M.match_record(book_path, book_size, entries, epub_identity)
+    if epub_identity then
+        local found={}
+        for _,entry in ipairs(entries or {}) do
+            if entry.name==epub_identity then
+                local synced=M.parse(entry.body)
+                if synced then
+                    found[#found+1]={
+                        name=entry.name,body=entry.body,size=book_size,
+                        fingerprint=epub_identity,position=synced.position,
+                        opaque=synced.opaque,etag=entry.etag,
+                        remote=entry.remote,remote_url=entry.remote_url
+                    }
+                end
+            end
+        end
+        if #found~=1 then
+            return nil,#found==0 and "EPUB sync ID not found" or "Ambiguous EPUB sync entries"
+        end
+        found[1].key="epub:"..epub_identity
+        return found[1]
+    end
+    -- FB2: identical uncompressed source size and substantial filename prefix.
     -- Never guess based on a singleton or size alone.
     if not book_path or not book_path:lower():match("%.fb2$") then return nil, "open a plain .fb2 book" end
     local name = book_path:match("([^/\\]+)$") or ""
